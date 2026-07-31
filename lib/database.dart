@@ -5,10 +5,16 @@ import 'models/gasto.dart';
 
 class DatabaseHelper {
   static Database? _db;
+  // FIX: Evita que _initDB se ejecute 2 veces si hay llamadas simultáneas
+  static Future<Database>? _dbFuture;
 
   static Future<Database> get db async {
-    _db ??= await _initDB();
-    return _db!;
+    if (_db != null) return _db!;
+    _dbFuture ??= _initDB().then((database) {
+      _db = database;
+      return database;
+    });
+    return _dbFuture!;
   }
 
   static Future<Database> _initDB() async {

@@ -18,14 +18,19 @@ class _PantallaCargaState extends State<PantallaCarga> {
     _iniciarIA();
   }
 
-  Future<void> _iniciarIA() async {
-    await GemmaService.init(
-      onProgress: (progreso) {
-        if (mounted) setState(() => _progreso = progreso);
-      },
-    );
+    Future<void> _iniciarIA() async {
+    try {
+      await GemmaService.init(
+        onProgress: (progreso) {
+          if (mounted) setState(() => _progreso = progreso);
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Gemma no pudo inicializarse: $e');
+      // La app funciona perfectamente sin IA (usa el regex fallback)
+    }
 
-    // Cuando termina de descargar, saltamos al Onboarding
+    // Siempre avanzamos al onboarding, haya IA o no
     if (mounted) {
       Navigator.pushReplacement(
         context,

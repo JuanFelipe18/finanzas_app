@@ -58,10 +58,9 @@ class GemmaService {
     }
   }
 
-  static Future<String> parsearGasto(String texto) async {
+    static Future<String> parsearGasto(String texto) async {
     if (_model == null) {
       await init();
-
       if (_model == null) throw Exception('Modelo no cargado.');
     }
 
@@ -72,21 +71,21 @@ class GemmaService {
 
     try {
       final promptOptimizado = '''Extrae movimientos financieros del texto en JSON. Sin movimientos: [].
-      Reglas:
-      -Un objeto por movimiento, nunca combines.
-      -d: palabra clave del texto, max 2 palabras.
-      -m: entero. "mil"/"lucas"/"k"=x1000. Punto en miles no es decimal (62.500=62500). Monto incierto: usa el mayor.
-      -t: "G" gasto, "I" ingreso (reembolso/devolución/pago recibido).
-      -c: una de [$categoriasEnRAM] o "Otros".
-      -me: "C" si dice "crédito"/"tarjeta crédito" o nombra banco sin especificar débito. "D" si dice débito/efectivo/transferencia o no se menciona.
-      -cu: Si me="C" y menciona meses/cuotas, pon el número. Si no, 1.
-      -Compartido: usa solo la parte del usuario.
-      -Recarga: gasto normal en su categoría.
-      -FUTURO: ignora cosas que no han pasado ("voy a comprar", "tengo que pagar"). Solo extrae pagos reales ya hechos.
+Reglas:
+-Un objeto por movimiento, nunca combines.
+-d: palabra clave del texto, max 2 palabras.
+-m: entero. "mil"/"lucas"/"k"=x1000. Punto en miles no es decimal (62.500=62500). Monto incierto: usa el mayor.
+-t: "G" gasto, "I" ingreso (reembolso/devolución/pago recibido).
+-c: una de [$categoriasEnRAM] o "Otros".
+-me: "C" si dice "crédito"/"tarjeta crédito" o nombra banco sin especificar débito. "D" si dice débito/efectivo/transferencia o no se menciona.
+-cu: Si me="C" y menciona meses/cuotas, pon el número. Si no, 1.
+-Compartido: usa solo la parte del usuario.
+-Recarga: gasto normal en su categoría.
+-FUTURO: ignora cosas que no han pasado ("voy a comprar", "tengo que pagar"). Solo extrae pagos reales ya hechos.
 
-      Ej: "cine 30k, luz 40mil credito a 2 cuotas, devolvieron 20mil tenis, mañana pago 50k arriendo" -> [{"d":"cine","m":30000,"t":"G","c":"Entretenimiento","me":"D","cu":1},{"d":"luz","m":40000,"t":"G","c":"Hogar","me":"C","cu":2},{"d":"tenis","m":20000,"t":"I","c":"Otros","me":"D","cu":1}]
+Ej: "cine 30k, luz 40mil credito a 2 cuotas, devolvieron 20mil tenis, mañana pago 50k arriendo" -> [{"d":"cine","m":30000,"t":"G","c":"Entretenimiento","me":"D","cu":1},{"d":"luz","m":40000,"t":"G","c":"Hogar","me":"C","cu":2},{"d":"tenis","m":20000,"t":"I","c":"Otros","me":"D","cu":1}]
 
-      Texto: "$texto"''';
+Texto: "$texto"''';
 
       await session.addQueryChunk(Message(
         text: promptOptimizado,
@@ -100,23 +99,23 @@ class GemmaService {
       final duracionMs = fin.difference(inicio).inMilliseconds;
       debugPrint("GEMMA_TIMING|inicio=${inicio.toIso8601String()}|fin=${fin.toIso8601String()}|duracion_ms=$duracionMs|input_len=${promptOptimizado.length}|output_len=${response.length}");
 
-      // Buscamos un Array [ ] o un Objeto individual { }
       final regexJson = RegExp(r'\[.*\]|\{.*\}', dotAll: true);
       final match = regexJson.firstMatch(response);
 
       if (match != null) {
         String jsonLimpio = match.group(0)!;
-
-        // Si la IA nos devolvió un solo gasto sin la lista, nosotros le ponemos los corchetes
         if (jsonLimpio.startsWith('{')) {
           jsonLimpio = '[$jsonLimpio]';
         }
-
         return jsonLimpio;
       } else {
-        throw Exception('Gemma no respondió con JSON.');
+        throw FormatException('Gemma no respondió con JSON válido. Respuesta: $response');
       }
+    } on FormatException catch (e) {
+      debugPrint('❌ Formato inválido de Gemma: $e');
+      rethrow;
     } catch (e) {
+      debugPrint('❌ Error en Gemma: $e');
       rethrow;
     } finally {
       await session.close();

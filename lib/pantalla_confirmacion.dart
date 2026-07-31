@@ -12,13 +12,40 @@ class PantallaConfirmacion extends StatefulWidget {
 }
 
 class _PantallaConfirmacionState extends State<PantallaConfirmacion> {
-  final List<String> _categorias = [
-    'Alimentación', 'Transporte', 'Salud', 'Entretenimiento',
-    'Hogar', 'Ropa', 'Educación', 'Otros'
-  ];
+  List<Map<String, dynamic>> _categoriasDB = [];
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCategorias();
+  }
+
+  Future<void> _cargarCategorias() async {
+    final cats = await DatabaseHelper.obtenerCategorias();
+    if (mounted) {
+      setState(() {
+        _categoriasDB = cats;
+        _cargando = false;
+      });
+    }
+  }
+
+  List<String> get _nombresCategorias {
+    if (_categoriasDB.isEmpty) {
+      return ['Alimentación', 'Transporte', 'Salud', 'Entretenimiento', 'Hogar', 'Ropa', 'Educación', 'Otros'];
+    }
+    return _categoriasDB.map((c) => c['nombre'] as String).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Confirmar gastos'),
@@ -30,6 +57,8 @@ class _PantallaConfirmacionState extends State<PantallaConfirmacion> {
         itemCount: widget.gastos.length,
         itemBuilder: (context, i) {
           final gasto = widget.gastos[i];
+          final categorias = _nombresCategorias;
+          
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: Padding(
@@ -43,9 +72,9 @@ class _PantallaConfirmacionState extends State<PantallaConfirmacion> {
                       style: const TextStyle(fontSize: 20, color: Colors.green)),
                   const SizedBox(height: 8),
                   DropdownButton<String>(
-                    value: gasto.categoria == 'Sin categoría' ? _categorias[7] : gasto.categoria,
+                    value: categorias.contains(gasto.categoria) ? gasto.categoria : categorias.last,
                     isExpanded: true,
-                    items: _categorias
+                    items: categorias
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
                     onChanged: (val) {
@@ -56,7 +85,9 @@ class _PantallaConfirmacionState extends State<PantallaConfirmacion> {
                   DropdownButton<String>(
                     value: ['Débito', 'Crédito'].contains(gasto.metodoPago) ? gasto.metodoPago : 'Débito',
                     isExpanded: true,
-                    items: ['Débito', 'Crédito'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                    items: ['Débito', 'Crédito']
+                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                        .toList(),
                     onChanged: (val) {
                       setState(() => gasto.metodoPago = val!);
                     },
@@ -74,13 +105,13 @@ class _PantallaConfirmacionState extends State<PantallaConfirmacion> {
             for (final gasto in widget.gastos) {
               await DatabaseHelper.insertarGasto(gasto);
             }
-            
-            if (!mounted) return; // <-- Nueva regla de Flutter cumplida
+
+            if (!mounted) return;
 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('✅ Gastos guardados')),
             );
-            
+
             Navigator.popUntil(context, (r) => r.isFirst);
           },
           style: ElevatedButton.styleFrom(

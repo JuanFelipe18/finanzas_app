@@ -28,6 +28,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   Map<int, double> _restantesSemanales = {};
   Map<int, List<Map<String, dynamic>>> _gastosPorSemana = {};
   List<Map<String, dynamic>> _gastosRecientes = [];
+  List<Map<String, dynamic>> _categoriasDisponibles = [];
   
   // Control del mes actual
   DateTime _mesSeleccionado = DateTime.now();
@@ -49,6 +50,8 @@ class _PantallaInicioState extends State<PantallaInicio> {
   Future<void> _cargarDashboard() async {
     await DatabaseHelper.inicializarCategorias();
     await GemmaService.refrescarCacheCategorias();
+
+    _categoriasDisponibles = await DatabaseHelper.obtenerCategorias();
 
     String tipo = await DatabaseHelper.obtenerTipoPresupuesto();
     String inicio = await DatabaseHelper.obtenerConfiguracion('inicio_semana', 'Lunes'); 
@@ -194,7 +197,9 @@ class _PantallaInicioState extends State<PantallaInicio> {
     String categoriaSeleccionada = gasto['categoria'];
     String metodoSeleccionado = gasto['metodo_pago'] ?? 'Débito';
     String fechaSeleccionada = gasto['fecha'] ?? DateTime.now().toIso8601String();
-    final categorias = ['Alimentación', 'Transporte', 'Salud', 'Entretenimiento', 'Hogar', 'Ropa', 'Educación', 'Otros'];
+    final categorias = _categoriasDisponibles.isNotEmpty
+    ? _categoriasDisponibles.map((c) => c['nombre'] as String).toList()
+    : ['Alimentación', 'Transporte', 'Salud', 'Entretenimiento', 'Hogar', 'Ropa', 'Educación', 'Otros'];
 
     showDialog(
       context: context,
