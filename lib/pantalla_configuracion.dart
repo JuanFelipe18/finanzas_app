@@ -1,23 +1,18 @@
 import 'package:flutter/material.dart';
-import 'database.dart'; // Asegúrate de que esta ruta sea correcta según dónde tengas tu archivo
+import 'database.dart';
 
-// BLOQUE 1: El Widget (Inmutable)
 class PantallaConfiguracion extends StatefulWidget {
-  // Esto soluciona el error del "key"
   const PantallaConfiguracion({super.key});
 
-  // Esto soluciona el error de "createState" missing
   @override
   State<PantallaConfiguracion> createState() => _PantallaConfiguracionState();
 }
 
-// BLOQUE 2: El Estado (Mutable, aquí van tus variables)
-// Esto soluciona el error de "@immutable"
 class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
   bool _presupuestoCategorias = false;
   String _tipoPresupuesto = 'Mensual';
-  String _modoSemanas = 'Dinámico'; // 'Dinámico' o 'Fijo 5'
-  String _inicioSemana = 'Lunes'; // 'Lunes' o 'Domingo'
+  String _modoSemanas = 'Dinámico';
+  String _inicioSemana = 'Lunes';
 
   @override
   void initState() {
@@ -30,14 +25,54 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
     String modo = await DatabaseHelper.obtenerConfiguracion('modo_semanas', 'Dinámico');
     String inicio = await DatabaseHelper.obtenerConfiguracion('inicio_semana', 'Lunes');
     String presupCat = await DatabaseHelper.obtenerConfiguracion('presupuesto_categorias', 'false');
-    // En tu setState:
-    _presupuestoCategorias = presupCat == 'true';
-    
+
     setState(() {
       _tipoPresupuesto = tipo;
       _modoSemanas = modo;
       _inicioSemana = inicio;
+      _presupuestoCategorias = presupCat == 'true';
     });
+  }
+
+  Future<void> _cargarDatosPrueba() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('🧪 Cargar datos de prueba'),
+        content: const Text(
+          'Esto insertará:\n'
+          '• Salario: \$4.000.000\n'
+          '• Meta ahorro: \$1.400.000\n'
+          '• 8 gastos fijos\n'
+          '• 12 gastos del mes actual\n\n'
+          '¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Cargar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    await DatabaseHelper.cargarDatosPrueba();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('✅ Datos de prueba cargados. Reinicia la app para ver todo.'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   @override
@@ -51,10 +86,13 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Preferencias de la App', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+          const Text(
+            'Preferencias de la App',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+          ),
           const SizedBox(height: 16),
-          
-          // TARJETA 1: Tipo de Presupuesto
+
+          // Tipo de Presupuesto
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -70,7 +108,9 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
                   ),
                   DropdownButton<String>(
                     value: _tipoPresupuesto,
-                    items: ['Mensual', 'Semanal'].map((tipo) => DropdownMenuItem(value: tipo, child: Text(tipo))).toList(),
+                    items: ['Mensual', 'Semanal']
+                        .map((tipo) => DropdownMenuItem(value: tipo, child: Text(tipo)))
+                        .toList(),
                     onChanged: (String? nuevoValor) async {
                       if (nuevoValor != null) {
                         setState(() => _tipoPresupuesto = nuevoValor);
@@ -83,6 +123,7 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
             ),
           ),
 
+          // Presupuesto por Categorías
           Card(
             child: SwitchListTile(
               title: const Text('Presupuesto por Categorías', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -96,13 +137,15 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
             ),
           ),
 
-          // Mostramos las configuraciones semanales SOLO si eligió Semanal
+          // Configuraciones semanales
           if (_tipoPresupuesto == 'Semanal') ...[
             const SizedBox(height: 24),
-            const Text('Ajustes Semanales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green)),
+            const Text(
+              'Ajustes Semanales',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
             const SizedBox(height: 16),
 
-            // TARJETA 2: Distribución de Semanas
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -131,7 +174,6 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
               ),
             ),
 
-            // TARJETA 3: Inicio de Semana
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -147,7 +189,9 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
                     ),
                     DropdownButton<String>(
                       value: _inicioSemana,
-                      items: ['Lunes', 'Domingo'].map((dia) => DropdownMenuItem(value: dia, child: Text(dia))).toList(),
+                      items: ['Lunes', 'Domingo']
+                          .map((dia) => DropdownMenuItem(value: dia, child: Text(dia)))
+                          .toList(),
                       onChanged: (String? val) async {
                         if (val != null) {
                           setState(() => _inicioSemana = val);
@@ -159,7 +203,25 @@ class _PantallaConfiguracionState extends State<PantallaConfiguracion> {
                 ),
               ),
             ),
-          ]
+          ],
+
+          // --- BOTÓN DE DATOS DE PRUEBA ---
+          const SizedBox(height: 40),
+          const Divider(),
+          const SizedBox(height: 16),
+          Card(
+            color: Colors.orange.shade50,
+            child: ListTile(
+              leading: const Icon(Icons.science, color: Colors.orange),
+              title: const Text(
+                'Cargar datos de prueba',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+              ),
+              subtitle: const Text('Inserta salario, fijos y gastos de ejemplo'),
+              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.orange),
+              onTap: _cargarDatosPrueba,
+            ),
+          ),
         ],
       ),
     );

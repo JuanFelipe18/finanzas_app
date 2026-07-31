@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 
 import 'gemma_service.dart';
-import 'models/gasto.dart'; // Aquí vive ahora tu clase Gasto y tu parsearGastos (Regex)
+import 'models/gasto_antiguo.dart'; // Aquí vive ahora tu clase Gasto y tu parsearGastos (Regex)
 import 'pantalla_confirmacion.dart';
 
 class PantallaRegistroGasto extends StatefulWidget {

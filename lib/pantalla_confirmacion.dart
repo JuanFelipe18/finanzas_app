@@ -1,7 +1,7 @@
 // lib/pantalla_confirmacion.dart
 import 'package:flutter/material.dart';
 import 'database.dart';
-import 'models/gasto.dart';
+import 'models/gasto_antiguo.dart';
 
 class PantallaConfirmacion extends StatefulWidget {
   final List<Gasto> gastos;
