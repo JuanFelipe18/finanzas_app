@@ -23,3 +23,10 @@ final presupuestoCategoriasProvider = FutureProvider.autoDispose<bool>((ref) asy
   final val = await repo.obtener('presupuesto_categorias', 'false');
   return val == 'true';
 });
+
+// NUEVO: Meta de ahorro
+final metaAhorroProvider = FutureProvider.autoDispose<double>((ref) async {
+  final repo = ref.watch(configRepositoryProvider);
+  final val = await repo.obtener('meta_ahorro', '0');
+  return double.tryParse(val) ?? 0.0;
+});
