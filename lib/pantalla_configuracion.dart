@@ -1,7 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'repositories/config_repository.dart';
-import 'providers/config_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers/config_provider.dart';
+import 'providers/categorias_provider.dart';
+import 'providers/dashboard_provider.dart';
+import 'repositories/config_repository.dart';
 import 'database.dart';
 
 class PantallaConfiguracion extends ConsumerWidget {
@@ -12,6 +14,11 @@ class PantallaConfiguracion extends ConsumerWidget {
     final tipoAsync = ref.watch(tipoPresupuestoProvider);
     final presupCatAsync = ref.watch(presupuestoCategoriasProvider);
     final configRepo = ref.read(configRepositoryProvider);
+
+    void invalidateDashboard() {
+      final mes = ref.read(mesSeleccionadoProvider);
+      ref.invalidate(dashboardProvider(mes));
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -54,6 +61,7 @@ class PantallaConfiguracion extends ConsumerWidget {
                         if (nuevoValor != null) {
                           await configRepo.guardar('tipo_presupuesto', nuevoValor);
                           ref.invalidate(tipoPresupuestoProvider);
+                          invalidateDashboard(); // <-- FIX: recarga el home
                         }
                       },
                     ),
@@ -76,6 +84,7 @@ class PantallaConfiguracion extends ConsumerWidget {
                 onChanged: (bool valor) async {
                   await configRepo.guardar('presupuesto_categorias', valor.toString());
                   ref.invalidate(presupuestoCategoriasProvider);
+                  ref.invalidate(categoriasProvider); // <-- FIX: recarga categorías
                 },
               ),
             ),
@@ -87,7 +96,10 @@ class PantallaConfiguracion extends ConsumerWidget {
             error: (_, _) => const SizedBox.shrink(),
             data: (tipo) {
               if (tipo != 'Semanal') return const SizedBox.shrink();
-              return _ConfigSemanal(configRepo: configRepo);
+              return _ConfigSemanal(
+                configRepo: configRepo,
+                onChanged: invalidateDashboard, // <-- FIX: recarga al cambiar semana
+              );
             },
           ),
 
@@ -157,7 +169,12 @@ class PantallaConfiguracion extends ConsumerWidget {
 
 class _ConfigSemanal extends StatefulWidget {
   final ConfigRepository configRepo;
-  const _ConfigSemanal({required this.configRepo});
+  final VoidCallback onChanged; // <-- NUEVO
+
+  const _ConfigSemanal({
+    required this.configRepo,
+    required this.onChanged, // <-- NUEVO
+  });
 
   @override
   State<_ConfigSemanal> createState() => _ConfigSemanalState();
@@ -215,6 +232,7 @@ class _ConfigSemanalState extends State<_ConfigSemanal> {
                     if (val != null) {
                       setState(() => _modoSemanas = val);
                       await widget.configRepo.guardar('modo_semanas', val);
+                      widget.onChanged(); // <-- FIX: recarga dashboard
                     }
                   },
                 ),
@@ -245,6 +263,7 @@ class _ConfigSemanalState extends State<_ConfigSemanal> {
                     if (val != null) {
                       setState(() => _inicioSemana = val);
                       await widget.configRepo.guardar('inicio_semana', val);
+                      widget.onChanged(); // <-- FIX: recarga dashboard
                     }
                   },
                 ),
