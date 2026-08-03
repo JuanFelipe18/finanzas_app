@@ -1,7 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'providers/config_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers/config_provider.dart';
 import 'providers/fijos_provider.dart';
 import 'models/fijo_model.dart';
 import 'pantalla_inicio.dart';
@@ -22,11 +22,6 @@ class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
   final FocusNode _montoFocus = FocusNode();
   final List<Map<String, dynamic>> _fijosTemporales = [];
 
-  String _formatearVistaMoneda(double cantidad) {
-    String numStr = cantidad.toStringAsFixed(0);
-    return numStr.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
-  }
-
   void _guardarPasoSalario(double salario) async {
     await ref.read(configRepositoryProvider).guardarSalario(salario);
     _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
@@ -38,27 +33,56 @@ class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
 
     if (descLimpia.isNotEmpty && monto > 0) {
       setState(() {
-        _fijosTemporales.add({'descripcion': descLimpia, 'monto': monto});
+        _fijosTemporales.add({
+          'descripcion': descLimpia,
+          'monto': monto,
+          'fechaPago': null,
+          'recordatorioDias': 0,
+          'recordatorioActivo': 0,
+        });
         _fijoDescController.clear();
         _fijoMontoController.clear();
       });
     }
   }
 
+  void _actualizarFijoTemporal(int index, {
+    int? fechaPago,
+    int? recordatorioDias,
+    int? recordatorioActivo,
+  }) {
+    setState(() {
+      if (fechaPago != null) _fijosTemporales[index]['fechaPago'] = fechaPago;
+      if (recordatorioDias != null) _fijosTemporales[index]['recordatorioDias'] = recordatorioDias;
+      if (recordatorioActivo != null) _fijosTemporales[index]['recordatorioActivo'] = recordatorioActivo;
+    });
+  }
+
   void _finalizarOnboarding() async {
-    final fijoRepo = ref.read(fijoRepositoryProvider);
-    for (var fijo in _fijosTemporales) {
-      await fijoRepo.insertar(FijoModel(
-        descripcion: fijo['descripcion'],
-        monto: fijo['monto'],
-      ));
-    }
-    await ref.read(configRepositoryProvider).completarOnboarding();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PantallaInicio()),
-      );
+    try {
+      final notifier = ref.read(fijosProvider.notifier);
+      for (var fijo in _fijosTemporales) {
+        await notifier.agregar(FijoModel(
+          descripcion: fijo['descripcion'],
+          monto: fijo['monto'],
+          fechaPago: fijo['fechaPago'],
+          recordatorioDias: fijo['recordatorioDias'],
+          recordatorioActivo: fijo['recordatorioActivo'],
+        ));
+      }
+      await ref.read(configRepositoryProvider).completarOnboarding();
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PantallaInicio()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -78,7 +102,7 @@ class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
               children: [
                 const Text('Tus Ingresos 💰', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                const Text('¿Cuál es tu salario neto o ingreso fijo mensual? (Lo que realmente llega a tu cuenta)', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                const Text('¿Cuál es tu salario neto o ingreso fijo mensual?', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _salarioController,
@@ -172,29 +196,11 @@ class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
                           itemCount: _fijosTemporales.length,
                           itemBuilder: (context, i) {
                             final item = _fijosTemporales[i];
-                            return Dismissible(
-                              key: UniqueKey(),
-                              direction: DismissDirection.endToStart,
-                              background: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                color: Colors.red,
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 20),
-                                child: const Icon(Icons.delete, color: Colors.white),
-                              ),
-                              onDismissed: (direction) {
-                                setState(() {
-                                  _fijosTemporales.removeAt(i);
-                                });
-                              },
-                              child: Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.lock, color: Colors.white, size: 18)),
-                                  title: Text(item['descripcion']),
-                                  trailing: Text('\$${_formatearVistaMoneda(item['monto'])}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                ),
-                              ),
+                            return _FijoTemporalTile(
+                              index: i,
+                              item: item,
+                              onUpdate: _actualizarFijoTemporal,
+                              onDelete: () => setState(() => _fijosTemporales.removeAt(i)),
                             );
                           },
                         ),
@@ -210,6 +216,111 @@ class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
               ],
             ),
           )
+        ],
+      ),
+    );
+  }
+}
+
+class _FijoTemporalTile extends StatefulWidget {
+  final int index;
+  final Map<String, dynamic> item;
+  final Function(int, {int? fechaPago, int? recordatorioDias, int? recordatorioActivo}) onUpdate;
+  final VoidCallback onDelete;
+
+  const _FijoTemporalTile({
+    required this.index,
+    required this.item,
+    required this.onUpdate,
+    required this.onDelete,
+  });
+
+  @override
+  State<_FijoTemporalTile> createState() => _FijoTemporalTileState();
+}
+
+class _FijoTemporalTileState extends State<_FijoTemporalTile> {
+  bool _tieneFecha = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tieneFecha = widget.item['fechaPago'] != null;
+  }
+
+    @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Colors.orange,
+              child: Icon(Icons.lock, color: Colors.white, size: 18),
+            ),
+            title: Text(item['descripcion']),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('\$${item['monto'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                  onPressed: widget.onDelete,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('¿Tiene fecha de pago?', style: TextStyle(fontSize: 13)),
+                  value: _tieneFecha,
+                  onChanged: (val) {
+                    setState(() => _tieneFecha = val);
+                    if (!val) widget.onUpdate(widget.index, fechaPago: null);
+                  },
+                ),
+                if (_tieneFecha) ...[
+                  Row(
+                    children: [
+                      const Text('Día: '),
+                      DropdownButton<int>(
+                        value: item['fechaPago'],
+                        hint: const Text('Elegir'),
+                        items: List.generate(31, (i) => i + 1)
+                            .map((d) => DropdownMenuItem(value: d, child: Text('$d')))
+                            .toList(),
+                        onChanged: (val) {
+                          setState(() {});
+                          widget.onUpdate(widget.index, fechaPago: val);
+                        },
+                      ),
+                      const Spacer(),
+                      const Text('Recordar: '),
+                      DropdownButton<int>(
+                        value: item['recordatorioDias'],
+                        items: List.generate(15, (i) => i)
+                            .map((d) => DropdownMenuItem(value: d, child: Text('$d ${d == 1 ? 'día' : 'días'}')))
+                            .toList(),
+                        onChanged: (val) {
+                          setState(() {});
+                          widget.onUpdate(widget.index, recordatorioDias: val, recordatorioActivo: val != null && val > 0 ? 1 : 0);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

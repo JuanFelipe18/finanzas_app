@@ -5,6 +5,7 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'services/notification_service.dart';
 import 'package:flutter/material.dart';
 
+import 'config/dev_config.dart';
 import 'pantalla_inicio.dart';
 import 'pantalla_carga.dart';
 import 'database.dart';
@@ -12,9 +13,11 @@ import 'database.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await FlutterGemma.initialize(
-    inferenceEngines: [LiteRtLmEngine()],
-  );
+    if (!kSkipGemma) {
+    await FlutterGemma.initialize(
+      inferenceEngines: [LiteRtLmEngine()],
+    );
+  }
 
   await NotificationService.init();
 

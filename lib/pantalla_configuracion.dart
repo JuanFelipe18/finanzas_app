@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'providers/config_provider.dart';
+import 'repositories/config_repository.dart';
 import 'providers/categorias_provider.dart';
 import 'providers/dashboard_provider.dart';
-import 'repositories/config_repository.dart';
+import 'providers/gastos_provider.dart';
+import 'providers/config_provider.dart';
+import 'providers/fijos_provider.dart';
+import 'package:flutter/material.dart';
 import 'database.dart';
 
 class PantallaConfiguracion extends ConsumerWidget {
@@ -117,7 +119,7 @@ class PantallaConfiguracion extends ConsumerWidget {
               ),
               subtitle: const Text('Inserta salario, fijos y gastos de ejemplo'),
               trailing: const Icon(Icons.arrow_forward_ios, color: Colors.orange),
-              onTap: () => _cargarDatosPrueba(context),
+              onTap: () => _cargarDatosPrueba(context, ref),
             ),
           ),
         ],
@@ -125,14 +127,14 @@ class PantallaConfiguracion extends ConsumerWidget {
     );
   }
 
-  Future<void> _cargarDatosPrueba(BuildContext context) async {
+    Future<void> _cargarDatosPrueba(BuildContext context, WidgetRef ref) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('🧪 Cargar datos de prueba'),
         content: const Text(
           'Esto insertará:\n'
-          '• Salario: \$4.000.000\n'
+          '• Salario: \$2.869.895\n'
           '• Meta ahorro: \$1.400.000\n'
           '• 8 gastos fijos\n'
           '• 12 gastos del mes actual\n\n'
@@ -156,11 +158,19 @@ class PantallaConfiguracion extends ConsumerWidget {
 
     await DatabaseHelper.cargarDatosPrueba();
 
+    // FIX: Invalidar todos los providers para que se vean inmediatamente
+    ref.invalidate(salarioProvider);
+    ref.invalidate(metaAhorroProvider);
+    ref.invalidate(fijosProvider);
+    ref.invalidate(gastosProvider);
+    ref.invalidate(categoriasProvider);
+    ref.invalidate(dashboardProvider(DateTime.now()));
+
     if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('✅ Datos de prueba cargados. Reinicia la app para ver todo.'),
+        content: Text('✅ Datos cargados. Ve a Inicio o Análisis.'),
         backgroundColor: Colors.green,
       ),
     );

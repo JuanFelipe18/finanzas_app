@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/dev_config.dart';
 import 'onboarding_page.dart';
 import 'gemma_service.dart';
 
@@ -19,25 +20,34 @@ class _PantallaCargaState extends State<PantallaCarga> {
   }
 
     Future<void> _iniciarIA() async {
-    try {
-      await GemmaService.init(
-        onProgress: (progreso) {
-          if (mounted) setState(() => _progreso = progreso);
-        },
-      );
-    } catch (e) {
-      debugPrint('⚠️ Gemma no pudo inicializarse: $e');
-      // La app funciona perfectamente sin IA (usa el regex fallback)
-    }
+      if (kSkipGemma) {
+        // Modo desarrollo: saltar descarga del modelo
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const PantallaOnboarding()),
+          );
+        }
+        return;
+      }
 
-    // Siempre avanzamos al onboarding, haya IA o no
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PantallaOnboarding()),
-      );
+      try {
+        await GemmaService.init(
+          onProgress: (progreso) {
+            if (mounted) setState(() => _progreso = progreso);
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ Gemma no pudo inicializarse: $e');
+      }
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PantallaOnboarding()),
+        );
+      }
     }
-  }
 
   @override
   Widget build(BuildContext context) {

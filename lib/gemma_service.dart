@@ -1,5 +1,6 @@
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter/foundation.dart';
+import '../config/dev_config.dart';
 import 'database.dart';
 
 class GemmaService {
@@ -59,6 +60,10 @@ class GemmaService {
   }
 
     static Future<String> parsearGasto(String texto) async {
+    if (kSkipGemma) {
+      throw Exception('Gemma desactivado en modo desarrollo.');
+    }
+    
     if (_model == null) {
       await init();
       if (_model == null) throw Exception('Modelo no cargado.');
