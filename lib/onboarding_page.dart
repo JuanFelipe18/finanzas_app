@@ -1,48 +1,43 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers/config_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'providers/fijos_provider.dart';
+import 'models/fijo_model.dart';
 import 'pantalla_inicio.dart';
-import 'database.dart';
 
-class PantallaOnboarding extends StatefulWidget {
+class PantallaOnboarding extends ConsumerStatefulWidget {
   const PantallaOnboarding({super.key});
 
   @override
-  State<PantallaOnboarding> createState() => _PantallaOnboardingState();
+  ConsumerState<PantallaOnboarding> createState() => _PantallaOnboardingState();
 }
 
-class _PantallaOnboardingState extends State<PantallaOnboarding> {
+class _PantallaOnboardingState extends ConsumerState<PantallaOnboarding> {
   final PageController _pageController = PageController();
   final TextEditingController _salarioController = TextEditingController();
-  
   final TextEditingController _fijoDescController = TextEditingController();
   final TextEditingController _fijoMontoController = TextEditingController();
-  
-  // <-- NUEVO: Los controles remotos del cursor
   final FocusNode _descFocus = FocusNode();
   final FocusNode _montoFocus = FocusNode();
-  
   final List<Map<String, dynamic>> _fijosTemporales = [];
 
-  // Función visual para ponerle puntos a la lista de fijos
   String _formatearVistaMoneda(double cantidad) {
     String numStr = cantidad.toStringAsFixed(0);
     return numStr.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
   }
 
   void _guardarPasoSalario(double salario) async {
-    await DatabaseHelper.guardarSalario(salario);
+    await ref.read(configRepositoryProvider).guardarSalario(salario);
     _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
   }
 
   void _agregarFijoTemporal() {
     double monto = double.tryParse(_fijoMontoController.text.replaceAll('.', '').trim()) ?? 0.0;
-    
-    // Aplicamos la lógica de capitalización directamente aquí
     String descLimpia = _fijoDescController.text.trim().split(' ').map((p) => p.isEmpty ? '' : '${p[0].toUpperCase()}${p.substring(1).toLowerCase()}').join(' ');
 
     if (descLimpia.isNotEmpty && monto > 0) {
       setState(() {
-        // Usamos descLimpia en lugar del texto crudo
         _fijosTemporales.add({'descripcion': descLimpia, 'monto': monto});
         _fijoDescController.clear();
         _fijoMontoController.clear();
@@ -51,15 +46,18 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
   }
 
   void _finalizarOnboarding() async {
+    final fijoRepo = ref.read(fijoRepositoryProvider);
     for (var fijo in _fijosTemporales) {
-      await DatabaseHelper.insertarFijo(fijo['descripcion'], fijo['monto']);
+      await fijoRepo.insertar(FijoModel(
+        descripcion: fijo['descripcion'],
+        monto: fijo['monto'],
+      ));
     }
-    await DatabaseHelper.completarOnboarding();
+    await ref.read(configRepositoryProvider).completarOnboarding();
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        // Al terminar los fijos, vamos directo al Dashboard
-        MaterialPageRoute(builder: (_) => const PantallaInicio()), 
+        MaterialPageRoute(builder: (_) => const PantallaInicio()),
       );
     }
   }
@@ -69,7 +67,7 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
     return Scaffold(
       body: PageView(
         controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(), 
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           // PASO 1: Salario
           Padding(
@@ -109,10 +107,9 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Botón para freelancers o personas sin ingreso fijo
                 Center(
                   child: TextButton(
-                    onPressed: () => _guardarPasoSalario(0.0), // Guarda 0 y avanza
+                    onPressed: () => _guardarPasoSalario(0.0),
                     child: const Text('No tengo ingresos fijos', style: TextStyle(color: Colors.grey, decoration: TextDecoration.underline)),
                   ),
                 )
@@ -136,10 +133,10 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                       flex: 2,
                       child: TextField(
                         controller: _fijoDescController,
-                        focusNode: _descFocus, // <-- 1. Le asignamos su nodo
+                        focusNode: _descFocus,
                         textCapitalization: TextCapitalization.words,
-                        textInputAction: TextInputAction.next, // Botón "Siguiente" en teclado
-                        onSubmitted: (_) => FocusScope.of(context).requestFocus(_montoFocus), // <-- 2. Salta al valor
+                        textInputAction: TextInputAction.next,
+                        onSubmitted: (_) => FocusScope.of(context).requestFocus(_montoFocus),
                         decoration: const InputDecoration(hintText: 'Ej: Arriendo'),
                       ),
                     ),
@@ -147,13 +144,13 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                     Expanded(
                       child: TextField(
                         controller: _fijoMontoController,
-                        focusNode: _montoFocus, // <-- 3. Le asignamos su nodo
+                        focusNode: _montoFocus,
                         keyboardType: TextInputType.number,
-                        textInputAction: TextInputAction.done, // Botón "Confirmar/Listo"
+                        textInputAction: TextInputAction.done,
                         inputFormatters: [FormatoMoneda()],
                         onSubmitted: (_) {
-                          _agregarFijoTemporal(); // <-- 4. Guarda el gasto en la lista
-                          FocusScope.of(context).requestFocus(_descFocus); // <-- 5. ¡Regresa el cursor al título!
+                          _agregarFijoTemporal();
+                          FocusScope.of(context).requestFocus(_descFocus);
                         },
                         decoration: const InputDecoration(hintText: 'Monto'),
                       ),
@@ -162,8 +159,7 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                       icon: const Icon(Icons.add_circle, color: Colors.green, size: 32),
                       onPressed: () {
                         _agregarFijoTemporal();
-                        // Si el usuario presiona el botón con el dedo, también le regresamos el cursor al título
-                        FocusScope.of(context).requestFocus(_descFocus); 
+                        FocusScope.of(context).requestFocus(_descFocus);
                       },
                     )
                   ],
@@ -176,9 +172,8 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                           itemCount: _fijosTemporales.length,
                           itemBuilder: (context, i) {
                             final item = _fijosTemporales[i];
-                            
                             return Dismissible(
-                              key: UniqueKey(), // Usamos UniqueKey porque aún no tienen ID en BD
+                              key: UniqueKey(),
                               direction: DismissDirection.endToStart,
                               background: Container(
                                 margin: const EdgeInsets.only(bottom: 8),
@@ -195,10 +190,8 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
                               child: Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 child: ListTile(
-                                  // Agregamos el icono naranja para mantener la estética de los fijos
                                   leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.lock, color: Colors.white, size: 18)),
                                   title: Text(item['descripcion']),
-                                  // Quitamos el botón de papelera original y dejamos solo el monto
                                   trailing: Text('\$${_formatearVistaMoneda(item['monto'])}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 ),
                               ),
@@ -223,7 +216,6 @@ class _PantallaOnboardingState extends State<PantallaOnboarding> {
   }
 }
 
-// (Mantén la clase FormatoMoneda exactamente igual que la tenías abajo)
 class FormatoMoneda extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {

@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/dashboard_data.dart';
 import '../services/presupuesto_service.dart';
 import '../services/dashboard_service.dart';
+import '../models/dashboard_data.dart';
+import 'categorias_provider.dart';
 import 'config_provider.dart';
 import 'gastos_provider.dart';
 import 'fijos_provider.dart';
-import 'categorias_provider.dart';
 
 final mesSeleccionadoProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
