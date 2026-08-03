@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'onboarding_page.dart';
-import 'dart:math';
-import 'models/fijo_model.dart';
-import 'providers/fijos_provider.dart';
+import 'services/notification_service.dart';
 import 'providers/config_provider.dart';
+import 'package:flutter/material.dart';
+import 'providers/fijos_provider.dart';
+import 'models/fijo_model.dart';
+import 'onboarding_page.dart';
 import 'utils.dart';
+import 'dart:math';
 
 class PantallaAnalisis extends ConsumerWidget {
   const PantallaAnalisis({super.key});
@@ -116,31 +117,38 @@ class PantallaAnalisis extends ConsumerWidget {
                   ],
                 ),
                 ...fijos.map((f) => Dismissible(
-                  key: Key('fijo_${f.id}'),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    color: Colors.red,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  onDismissed: (_) async {
-                    await ref.read(fijosProvider.notifier).eliminar(f.id!);
-                  },
-                  child: Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.orange.shade100,
-                        child: Text(f.icono, style: const TextStyle(fontSize: 18)),
-                      ),
-                      title: Text(f.descripcion, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: Text('\$${AppUtils.formatearMoneda(f.monto)}'),
-                      onTap: () => _dialogoFijo(context, ref, fijoExistente: f),
+                key: Key('fijo_${f.id}'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: Colors.red,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                onDismissed: (_) async {
+                  await ref.read(fijosProvider.notifier).eliminar(f.id!);
+                  await NotificationService.cancelarRecordatorio(f.id!);
+                },
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.orange.shade100,
+                      child: Text(f.icono, style: const TextStyle(fontSize: 18)),
                     ),
+                    title: Text(f.descripcion, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: f.fechaPago != null
+                        ? Text(
+                            'Paga el día ${f.fechaPago}${f.tieneRecordatorio ? ' • 🔔 $f.recordatorioDias días antes' : ''}',
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                          )
+                        : null,
+                    trailing: Text('\$${AppUtils.formatearMoneda(f.monto)}'),
+                    onTap: () => _dialogoFijo(context, ref, fijoExistente: f),
                   ),
-                )),
+                ),
+              )),
               ],
             ),
           ),
@@ -211,12 +219,18 @@ class PantallaAnalisis extends ConsumerWidget {
     );
   }
 
-  void _dialogoFijo(BuildContext context, WidgetRef ref, {FijoModel? fijoExistente}) {
+    void _dialogoFijo(BuildContext context, WidgetRef ref, {FijoModel? fijoExistente}) {
     final descController = TextEditingController(text: fijoExistente?.descripcion ?? '');
     final montoController = TextEditingController(
       text: fijoExistente != null ? AppUtils.formatearMoneda(fijoExistente.monto) : '',
     );
     final iconoController = TextEditingController(text: fijoExistente?.icono ?? '🔒');
+
+    // NUEVO: Estado de fecha y recordatorio
+    bool tieneFecha = fijoExistente?.fechaPago != null;
+    int? diaSeleccionado = fijoExistente?.fechaPago;
+    int diasAntes = fijoExistente?.recordatorioDias ?? 3;
+    bool recordatorioActivo = fijoExistente?.recordatorioActivo == 1;
 
     final List<String> emojisSugeridos = [
       '🔒', '🏠', '💡', '💧', '🔥', '🛋️', '📱', '💻', '🚗', '🚌',
@@ -263,78 +277,153 @@ class PantallaAnalisis extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(fijoExistente == null ? 'Nuevo Gasto Fijo' : 'Editar Fijo'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: iconoController,
-                    readOnly: true,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 28),
-                    onTap: mostrarSelectorEmoji,
-                    decoration: const InputDecoration(labelText: 'Emoji', counterText: ''),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setStateDialog) {
+          return AlertDialog(
+            title: Text(fijoExistente == null ? 'Nuevo Gasto Fijo' : 'Editar Fijo'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: iconoController,
+                          readOnly: true,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 28),
+                          onTap: mostrarSelectorEmoji,
+                          decoration: const InputDecoration(labelText: 'Emoji', counterText: ''),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 5,
+                        child: TextField(
+                          controller: descController,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(labelText: 'Descripción'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 5,
-                  child: TextField(
-                    controller: descController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Descripción'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: montoController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FormatoMoneda()],
+                    decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$'),
                   ),
+                  const SizedBox(height: 16),
+                  // NUEVO: Switch de fecha fija
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('¿Tiene fecha de pago?', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Ej: suscripciones, recibos'),
+                    value: tieneFecha,
+                    activeColor: Colors.green,
+                    onChanged: (val) => setStateDialog(() => tieneFecha = val),
+                  ),
+                  // NUEVO: Selector de día del mes
+                  if (tieneFecha) ...[
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Día de pago', style: TextStyle(fontSize: 14)),
+                      trailing: DropdownButton<int>(
+                        value: diaSeleccionado,
+                        hint: const Text('Seleccionar'),
+                        items: List.generate(31, (i) => i + 1)
+                            .map((d) => DropdownMenuItem(value: d, child: Text('$d')))
+                            .toList(),
+                        onChanged: (val) => setStateDialog(() => diaSeleccionado = val),
+                      ),
+                    ),
+                    // NUEVO: Recordatorio
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Recordarme', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('Avisarme $diasAntes días antes'),
+                      value: recordatorioActivo,
+                      activeColor: Colors.orange,
+                      onChanged: (val) => setStateDialog(() => recordatorioActivo = val),
+                    ),
+                    if (recordatorioActivo) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text('Avisarme '),
+                          DropdownButton<int>(
+                            value: diasAntes,
+                            items: List.generate(15, (i) => i)
+                                .map((d) => DropdownMenuItem(value: d, child: Text('$d ${d == 1 ? 'día' : 'días'}')))
+                                .toList(),
+                            onChanged: (val) => setStateDialog(() {
+                              diasAntes = val ?? 3;
+                            }),
+                          ),
+                          const Text(' antes'),
+                        ],
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (fijoExistente != null)
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () async {
+                    await ref.read(fijosProvider.notifier).eliminar(fijoExistente.id!);
+                    await NotificationService.cancelarRecordatorio(fijoExistente.id!);
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  },
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: montoController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FormatoMoneda()],
-              decoration: const InputDecoration(labelText: 'Monto', prefixText: '\$'),
-            ),
-          ],
-        ),
-        actions: [
-          if (fijoExistente != null)
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () async {
-                await ref.read(fijosProvider.notifier).eliminar(fijoExistente.id!);
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              },
-            ),
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () async {
-              final monto = double.tryParse(montoController.text.replaceAll('.', '')) ?? 0.0;
-              final desc = AppUtils.capitalizarTexto(descController.text);
-              final icono = iconoController.text.isNotEmpty ? iconoController.text : '🔒';
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancelar')),
+              ElevatedButton(
+                onPressed: () async {
+                  final monto = double.tryParse(montoController.text.replaceAll('.', '')) ?? 0.0;
+                  final desc = AppUtils.capitalizarTexto(descController.text);
+                  final icono = iconoController.text.isNotEmpty ? iconoController.text : '🔒';
 
-              if (desc.isNotEmpty && monto > 0) {
-                final notifier = ref.read(fijosProvider.notifier);
-                if (fijoExistente == null) {
-                  await notifier.agregar(FijoModel(descripcion: desc, monto: monto, icono: icono));
-                } else {
-                  await notifier.actualizar(fijoExistente.copyWith(
-                    descripcion: desc,
-                    monto: monto,
-                    icono: icono,
-                  ));
-                }
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
+                  if (desc.isNotEmpty && monto > 0) {
+                    final notifier = ref.read(fijosProvider.notifier);
+                    final fijo = FijoModel(
+                      id: fijoExistente?.id,
+                      descripcion: desc,
+                      monto: monto,
+                      icono: icono,
+                      fechaPago: tieneFecha ? diaSeleccionado : null,
+                      recordatorioDias: recordatorioActivo ? diasAntes : 0,
+                      recordatorioActivo: recordatorioActivo && tieneFecha ? 1 : 0,
+                    );
+
+                    if (fijoExistente == null) {
+                      await notifier.agregar(fijo);
+                    } else {
+                      await notifier.actualizar(fijo);
+                    }
+
+                    // Programar/cancelar notificación
+                    if (fijo.tieneRecordatorio && fijo.id != null) {
+                      await NotificationService.programarRecordatorioFijo(fijo);
+                    } else if (fijoExistente?.id != null) {
+                      await NotificationService.cancelarRecordatorio(fijoExistente!.id!);
+                    }
+
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

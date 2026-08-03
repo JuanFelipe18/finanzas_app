@@ -1,7 +1,6 @@
-// lib/database.dart
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import 'models/gasto_antiguo.dart';
+import 'package:path/path.dart';
 
 class DatabaseHelper {
   static Database? _db;
@@ -21,7 +20,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE configuracion (
@@ -76,7 +75,12 @@ class DatabaseHelper {
         if (oldVersion < 4) {
           await db.execute("ALTER TABLE fijos ADD COLUMN icono TEXT DEFAULT '🔒'");
         }
-      }
+        if (oldVersion < 5) {
+          await db.execute("ALTER TABLE fijos ADD COLUMN fecha_pago INTEGER");
+          await db.execute("ALTER TABLE fijos ADD COLUMN recordatorio_dias INTEGER DEFAULT 0");
+          await db.execute("ALTER TABLE fijos ADD COLUMN recordatorio_activo INTEGER DEFAULT 0");
+        }
+      },
     );
   }
 
@@ -111,20 +115,44 @@ class DatabaseHelper {
   }
 
   // --- MÉTODOS PARA FIJOS ---
-  static Future<void> insertarFijo(String descripcion, double monto, {String icono = '🔒'}) async {
+    static Future<void> insertarFijo(String descripcion, double monto, {
+    String icono = '🔒',
+    int? fechaPago,
+    int recordatorioDias = 0,
+    int recordatorioActivo = 0,
+  }) async {
     final database = await db;
-    await database.insert('fijos', {'descripcion': descripcion, 'monto': monto, 'icono': icono});
+    await database.insert('fijos', {
+      'descripcion': descripcion,
+      'monto': monto,
+      'icono': icono,
+      'fecha_pago': fechaPago,
+      'recordatorio_dias': recordatorioDias,
+      'recordatorio_activo': recordatorioActivo,
+    });
+  }
+
+  static Future<void> actualizarFijo(int id, String descripcion, double monto, {
+    String icono = '🔒',
+    int? fechaPago,
+    int recordatorioDias = 0,
+    int recordatorioActivo = 0,
+  }) async {
+    final database = await db;
+    await database.update('fijos', {
+      'descripcion': descripcion,
+      'monto': monto,
+      'icono': icono,
+      'fecha_pago': fechaPago,
+      'recordatorio_dias': recordatorioDias,
+      'recordatorio_activo': recordatorioActivo,
+    }, where: 'id = ?', whereArgs: [id]);
   }
 
   static Future<List<Map<String, dynamic>>> obtenerFijos() async {
     final database = await db;
     return await database.query('fijos');
-  }
-
-  static Future<void> actualizarFijo(int id, String descripcion, double monto, {String icono = '🔒'}) async {
-    final database = await db;
-    await database.update('fijos', {'descripcion': descripcion, 'monto': monto, 'icono': icono}, where: 'id = ?', whereArgs: [id]);
-  }
+  }  
 
   static Future<void> eliminarFijo(int id) async {
     final database = await db;

@@ -12,6 +12,9 @@ class FijoRepository {
       fijo.descripcion,
       fijo.monto,
       icono: fijo.icono,
+      fechaPago: fijo.fechaPago,
+      recordatorioDias: fijo.recordatorioDias,
+      recordatorioActivo: fijo.recordatorioActivo,
     );
   }
 
@@ -22,6 +25,9 @@ class FijoRepository {
       fijo.descripcion,
       fijo.monto,
       icono: fijo.icono,
+      fechaPago: fijo.fechaPago,
+      recordatorioDias: fijo.recordatorioDias,
+      recordatorioActivo: fijo.recordatorioActivo,
     );
   }
 

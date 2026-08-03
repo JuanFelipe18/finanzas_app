@@ -16,8 +16,10 @@ dependencies:
   flutter_gemma_litertlm: any
   flutter_localizations:
     sdk: flutter
-  intl: ^0.20.2          # <-- FIX: 0.20.2 en lugar de 0.19.0
+  intl: ^0.20.2
   flutter_riverpod: ^2.5.1
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
 
 dev_dependencies:
   flutter_test:

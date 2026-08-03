@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_gemma_litertlm/flutter_gemma_litertlm.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_gemma/flutter_gemma.dart';
+import 'services/notification_service.dart';
+import 'package:flutter/material.dart';
 
 import 'pantalla_inicio.dart';
 import 'pantalla_carga.dart';
@@ -15,10 +16,12 @@ void main() async {
     inferenceEngines: [LiteRtLmEngine()],
   );
 
+  await NotificationService.init();
+
   bool onboardingCompleto = await DatabaseHelper.esOnboardingCompleto();
 
   runApp(
-    ProviderScope( // <-- NUEVO: Envuelve toda la app
+    ProviderScope(
       child: FinanzasApp(onboardingCompleto: onboardingCompleto),
     ),
   );
